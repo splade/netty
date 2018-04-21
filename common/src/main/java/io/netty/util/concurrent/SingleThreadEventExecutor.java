@@ -54,6 +54,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
     private static final InternalLogger logger =
             InternalLoggerFactory.getInstance(SingleThreadEventExecutor.class);
 
+    // 线程的状态
     private static final int ST_NOT_STARTED = 1;
     private static final int ST_STARTED = 2;
     private static final int ST_SHUTTING_DOWN = 3;
@@ -79,12 +80,20 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
             AtomicReferenceFieldUpdater.newUpdater(
                     SingleThreadEventExecutor.class, ThreadProperties.class, "threadProperties");
 
+    // 任务队列
     private final Queue<Runnable> taskQueue;
 
+    // 关联的线程
     private volatile Thread thread;
+
+
     @SuppressWarnings("unused")
     private volatile ThreadProperties threadProperties;
+
+    // 执行器
     private final Executor executor;
+
+    // 是否被中断
     private volatile boolean interrupted;
 
     private final Semaphore threadLock = new Semaphore(0);
@@ -110,7 +119,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
      * @param parent            the {@link EventExecutorGroup} which is the parent of this instance and belongs to it
      * @param threadFactory     the {@link ThreadFactory} which will be used for the used {@link Thread}
      * @param addTaskWakesUp    {@code true} if and only if invocation of {@link #addTask(Runnable)} will wake up the
-     *                          executor thread
+     *                          executor thread 当且仅当调用 addTask 时才唤醒执行器线程
      */
     protected SingleThreadEventExecutor(
             EventExecutorGroup parent, ThreadFactory threadFactory, boolean addTaskWakesUp) {
@@ -179,6 +188,9 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
      * {@link LinkedBlockingQueue} but if your sub-class of {@link SingleThreadEventExecutor} will not do any blocking
      * calls on the this {@link Queue} it may make sense to {@code @Override} this and return some more performant
      * implementation that does not support blocking operations at all.
+     *
+     * 是否支持阻塞操作
+     *
      */
     protected Queue<Runnable> newTaskQueue(int maxPendingTasks) {
         return new LinkedBlockingQueue<Runnable>(maxPendingTasks);
@@ -231,6 +243,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
 
         BlockingQueue<Runnable> taskQueue = (BlockingQueue<Runnable>) this.taskQueue;
         for (;;) {
+            // 任务类型： ScheduledFutureTask, FutureTask
             ScheduledFutureTask<?> scheduledTask = peekScheduledTask();
             if (scheduledTask == null) {
                 Runnable task = null;
@@ -449,6 +462,8 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
      * usually no need to call this method.  However, if you take the tasks manually using {@link #takeTask()} or
      * {@link #pollTask()}, you have to call this method at the end of task execution loop for accurate quiet period
      * checks.
+     *
+     * 更新最后执行事件
      */
     protected void updateLastExecutionTime() {
         lastExecutionTime = ScheduledFutureTask.nanoTime();
@@ -466,6 +481,9 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
         // NOOP
     }
 
+    // 往队列里添加一个任务：
+    // 1. 调用者 和 Executor 不是同一个线程， 那么就往 Executor 中添加一个任务。
+    // 2. 要关闭的时候
     protected void wakeup(boolean inEventLoop) {
         if (!inEventLoop || state == ST_SHUTTING_DOWN) {
             // Use offer as we actually only need this to unblock the thread and if offer fails we do not care as there
@@ -535,6 +553,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
         return ran;
     }
 
+    // timeout 不小于 quiet period
     @Override
     public Future<?> shutdownGracefully(long quietPeriod, long timeout, TimeUnit unit) {
         if (quietPeriod < 0) {
@@ -570,7 +589,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
                     case ST_STARTED:
                         newState = ST_SHUTTING_DOWN;
                         break;
-                    default:
+                    default: // ST_SHUTTING_DOWN, ST_SHUTDOWN, ST_TERMINATED
                         newState = oldState;
                         wakeup = false;
                 }
@@ -857,6 +876,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
 
     private void startThread() {
         if (state == ST_NOT_STARTED) {
+            // 无锁
             if (STATE_UPDATER.compareAndSet(this, ST_NOT_STARTED, ST_STARTED)) {
                 try {
                     doStartThread();
@@ -868,9 +888,13 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
         }
     }
 
+    // 工作者线程启动
     private void doStartThread() {
         assert thread == null;
+
+        // 让一个执行器来执行
         executor.execute(new Runnable() {
+            // 在一个单独的线程中运行
             @Override
             public void run() {
                 thread = Thread.currentThread();
@@ -881,6 +905,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
                 boolean success = false;
                 updateLastExecutionTime();
                 try {
+                    // 开始不断的接受任务，执行任务了
                     SingleThreadEventExecutor.this.run();
                     success = true;
                 } catch (Throwable t) {
@@ -912,6 +937,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
                         try {
                             cleanup();
                         } finally {
+                            // 更新外部的 Executor 对象的字段
                             STATE_UPDATER.set(SingleThreadEventExecutor.this, ST_TERMINATED);
                             threadLock.release();
                             if (!taskQueue.isEmpty()) {
