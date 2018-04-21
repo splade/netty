@@ -23,6 +23,8 @@ import java.util.Queue;
 import java.util.concurrent.TimeUnit;
 
 /**
+ * 在调用者线程中执行 Runnable 方法。
+ *
  * Executes {@link Runnable} objects in the caller's thread. If the {@link #execute(Runnable)} is reentrant it will be
  * queued until the original {@link Runnable} finishes execution.
  * <p>
@@ -41,6 +43,8 @@ public final class ImmediateEventExecutor extends AbstractEventExecutor {
             return new ArrayDeque<Runnable>();
         }
     };
+
+    // 多线程
     /**
      * Set to {@code true} if we are executing a runnable.
      */
@@ -56,6 +60,7 @@ public final class ImmediateEventExecutor extends AbstractEventExecutor {
 
     private ImmediateEventExecutor() { }
 
+    // 在调用者线程中执行，所以总是 true
     @Override
     public boolean inEventLoop() {
         return true;
@@ -124,6 +129,7 @@ public final class ImmediateEventExecutor extends AbstractEventExecutor {
                 RUNNING.set(false);
             }
         } else {
+            // 如果真正运行，添加到延迟队列
             DELAYED_RUNNABLES.get().add(command);
         }
     }

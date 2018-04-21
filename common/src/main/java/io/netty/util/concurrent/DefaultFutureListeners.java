@@ -42,7 +42,7 @@ final class DefaultFutureListeners {
         GenericFutureListener<? extends Future<?>>[] listeners = this.listeners;
         final int size = this.size;
         if (size == listeners.length) {
-            this.listeners = listeners = Arrays.copyOf(listeners, size << 1);
+            this.listeners = listeners = Arrays.copyOf(listeners, size << 1); // 直接扩倍
         }
         listeners[size] = l;
         this.size = size + 1;

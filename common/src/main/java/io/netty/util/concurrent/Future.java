@@ -21,6 +21,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * The result of an asynchronous operation.
+ * 异步操作的结果 Holder
  */
 @SuppressWarnings("ClassNameSameAsAncestorName")
 public interface Future<V> extends java.util.concurrent.Future<V> {
@@ -51,6 +52,10 @@ public interface Future<V> extends java.util.concurrent.Future<V> {
      * specified listener is notified when this future is
      * {@linkplain #isDone() done}.  If this future is already
      * completed, the specified listener is notified immediately.
+     *
+     * Future:
+     *  1. isDone 的时候，调用
+     *  2. 添加的时候，已经完成了，立即调用
      */
     Future<V> addListener(GenericFutureListener<? extends Future<? super V>> listener);
 
@@ -83,17 +88,23 @@ public interface Future<V> extends java.util.concurrent.Future<V> {
     /**
      * Waits for this future until it is done, and rethrows the cause of the failure if this future
      * failed.
+     *
+     * 同步等待，响应中断
      */
     Future<V> sync() throws InterruptedException;
 
     /**
      * Waits for this future until it is done, and rethrows the cause of the failure if this future
      * failed.
+     *
+     * 同步等待不响应中断
      */
     Future<V> syncUninterruptibly();
 
     /**
      * Waits for this future to be completed.
+     *
+     * 等待方法，带超时。注意和 sync 方法的区别 ?
      *
      * @throws InterruptedException
      *         if the current thread was interrupted
@@ -156,12 +167,14 @@ public interface Future<V> extends java.util.concurrent.Future<V> {
      *
      * As it is possible that a {@code null} value is used to mark the future as successful you also need to check
      * if the future is really done with {@link #isDone()} and not relay on the returned {@code null} value.
+     *
+     * 需要使用 isDone 判断状态
      */
     V getNow();
 
     /**
      * {@inheritDoc}
-     *
+     * 取消操作
      * If the cancellation was successful it will fail the future with an {@link CancellationException}.
      */
     @Override

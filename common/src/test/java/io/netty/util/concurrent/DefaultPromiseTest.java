@@ -73,10 +73,39 @@ public class DefaultPromiseTest {
         promise.get();
     }
 
+    @Test
+    public void testImmediateEventExecutor() {
+        ImmediateEventExecutor.INSTANCE.execute(new Runnable() {
+            @Override
+            public void run() {
+
+                ImmediateEventExecutor.INSTANCE.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        System.out.println("BB");
+
+                        ImmediateEventExecutor.INSTANCE.execute(new Runnable() {
+                            @Override
+                            public void run() {
+                                System.out.println("DD");
+                            }
+                        });
+
+                        System.out.println("CC");
+                    }
+                });
+                System.out.println("AA");
+            }
+        });
+    }
+
     @Test(expected = CancellationException.class)
     public void testCancellationExceptionIsThrownWhenBlockingGetWithTimeout() throws InterruptedException,
             ExecutionException, TimeoutException {
         final Promise<Void> promise = new DefaultPromise<Void>(ImmediateEventExecutor.INSTANCE);
+        // 调用 cancel 会触发执行所有通知的执行：
+        //      1. 执行成功
+        //
         promise.cancel(false);
         promise.get(1, TimeUnit.SECONDS);
     }
@@ -199,7 +228,7 @@ public class DefaultPromiseTest {
         testPromiseListenerAddWhenComplete(null);
     }
 
-    @Test(timeout = 2000)
+    @Test(timeout = 20000000)
     public void testLateListenerIsOrderedCorrectlySuccess() throws InterruptedException {
         testLateListenerIsOrderedCorrectly(null);
     }
@@ -369,6 +398,7 @@ public class DefaultPromiseTest {
             promise.addListener(new FutureListener<Void>() {
                 @Override
                 public void operationComplete(Future<Void> future) throws Exception {
+                    System.out.println(future);
                     assertTrue(state.compareAndSet(0, 1));
                 }
             });
